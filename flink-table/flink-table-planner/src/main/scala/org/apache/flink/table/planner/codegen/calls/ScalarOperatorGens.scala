@@ -1668,6 +1668,110 @@ object ScalarOperatorGens {
     generateUnaryOperatorIfNotNull(ctx, resultType, map)(_ => s"${map.resultTerm}.size()")
   }
 
+  def generateVariantGet(
+      ctx: CodeGeneratorContext,
+      variant: GeneratedExpression,
+      key: GeneratedExpression): GeneratedExpression = {
+    val Seq(resultTerm, nullTerm) = newNames(ctx, "result", "isNull")
+    val binaryVariantTerm = newName(ctx, "binaryVariantTerm")
+    // 获取variant类型信息
+    val variantType = variant.resultType.asInstanceOf[VariantType]
+    val keyType = key.resultType
+
+    // 类型定义
+    val variantTypeTerm = primitiveTypeTermForType(variantType)
+    val variantDefault = primitiveDefaultValue(variantType)
+    val variantTerm = variant.resultTerm
+    val keyTerm = key.resultTerm
+
+    // 根据key类型生成不同的访问代码
+    val accessCode = keyType match {
+      // todo check 'a' | 'a'+'b' | 'ab' | "ab" | "a"+"b"
+      case _: CharType | _: VarCharType =>
+        generateStringKeyAccess(
+          variantTerm,
+          binaryVariantTerm,
+          keyTerm,
+          resultTerm,
+          nullTerm
+        )
+      case _: IntType =>
+        generateIntegerKeyAccess(
+          variantTerm,
+          binaryVariantTerm,
+          keyTerm,
+          resultTerm,
+          nullTerm
+        )
+      case _ =>
+        throw new ValidationException(
+          // todo check return type 需要标识为什么，应该是上层的比较合理
+//          return Signature.Argument.of("[<INTEGER NUMERIC> | <MAP_KEY_TYPE> | <CHARACTER STRING>]");
+          s"Unsupported key type for Variant access: $keyType. " +
+            s"Only Integer, String, Varchar, Char types are supported."
+        )
+    }
+
+    val finalCode =
+      s"""
+         |${variant.code}
+         |${key.code}
+         |boolean $nullTerm = (${variant.nullTerm}|| ${key.nullTerm});
+         |$variantTypeTerm $resultTerm = $variantDefault;
+         |if (!$nullTerm) {
+         |  $accessCode
+         |}
+      """.stripMargin
+
+    GeneratedExpression(resultTerm, nullTerm, finalCode, variantType)
+  }
+
+  /** 生成String类型key的访问代码 */
+  private def generateStringKeyAccess(
+      variantTerm: String,
+      binaryVariantTerm: String,
+      keyTerm: String,
+      resultTerm: String,
+      nullTerm: String): String = {
+    s"""
+       |  if ($variantTerm instanceof $BINARY_VARIANT) {
+       |    $BINARY_VARIANT $binaryVariantTerm = ($BINARY_VARIANT) $variantTerm;
+       |    // Convert key to String representation
+       |    String keyStr = null;
+       |    if ($keyTerm instanceof $BINARY_STRING) {
+       |      keyStr = (($BINARY_STRING) $keyTerm).toString();
+       |    } else {
+       |      keyStr = String.valueOf($keyTerm);
+       |    }
+       |
+       |    if (keyStr != null) {
+       |      $resultTerm = $binaryVariantTerm.getField(keyStr);
+       |    } else {
+       |      $nullTerm = true;
+       |    }
+       |  } else {
+       |    $nullTerm = true;
+       |  }
+    """.stripMargin
+  }
+
+  /** 生成int类型key的访问代码 */
+  private def generateIntegerKeyAccess(
+      variantTerm: String,
+      binaryVariantTerm: String,
+      keyTerm: String,
+      resultTerm: String,
+      nullTerm: String): String = {
+    s"""
+       |  if ($variantTerm instanceof $BINARY_VARIANT) {
+       |    $BINARY_VARIANT $binaryVariantTerm = ($BINARY_VARIANT) $variantTerm;
+       |    $resultTerm = $binaryVariantTerm.getElement((int)$keyTerm - 1);
+       |  } else {
+       |    $nullTerm = true;
+       |  }
+    """.stripMargin
+  }
+
   // ----------------------------------------------------------------------------------------
   // private generate utils
   // ----------------------------------------------------------------------------------------
