@@ -1897,7 +1897,7 @@ object ScalarOperatorGens {
 
     // 验证key类型是否支持
     val isStringKey = keyType match {
-      case _: CharType | _: VarCharType => true
+      case _: CharType | _: VarCharType => true // todo:check
       case _: IntType => false
       case _ => throw new IllegalArgumentException(
         s"Unsupported key type for Variant access: $keyType. " +

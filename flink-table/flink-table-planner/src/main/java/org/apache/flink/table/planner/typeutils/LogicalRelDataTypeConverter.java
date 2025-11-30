@@ -57,6 +57,7 @@ import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
+import org.apache.flink.table.types.logical.VariantType;
 import org.apache.flink.table.types.logical.YearMonthIntervalType;
 import org.apache.flink.table.types.logical.YearMonthIntervalType.YearMonthResolution;
 import org.apache.flink.table.types.logical.ZonedTimestampType;
@@ -416,6 +417,12 @@ public final class LogicalRelDataTypeConverter {
                             .map(f -> toRelDataType(f.getType(), relDataTypeFactory))
                             .collect(Collectors.toList()),
                     rowType.getFieldNames());
+        }
+        // todo:支持filed visit
+        @Override
+        public RelDataType visit(VariantType variantType) {
+            // 参考LogicalRelDataTypeConverter？
+            throw new TableException("variant Type is currently not supported.");
         }
 
         @Override

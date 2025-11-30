@@ -22,6 +22,7 @@ import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.types.variant.BinaryVariant;
 import org.apache.flink.types.variant.Variant;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -74,10 +75,12 @@ public final class VariantType extends LogicalType {
     public Class<?> getDefaultConversion() {
         return Variant.class;
     }
-
+    //todo：map类型的kv是固定的类型，Structed类型的kv是存了的，我的呢？？
+    // 我的key一定是string，v一定是VARIANT
+    // todo:check
     @Override
     public List<LogicalType> getChildren() {
-        return Collections.emptyList();
+        return Collections.unmodifiableList(Arrays.asList(new CharType(), new VariantType()));
     }
 
     @Override

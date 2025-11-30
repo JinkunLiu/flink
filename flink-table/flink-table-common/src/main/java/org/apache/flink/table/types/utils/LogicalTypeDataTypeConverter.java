@@ -55,6 +55,7 @@ import org.apache.flink.table.types.logical.TimestampType;
 import org.apache.flink.table.types.logical.TinyIntType;
 import org.apache.flink.table.types.logical.VarBinaryType;
 import org.apache.flink.table.types.logical.VarCharType;
+import org.apache.flink.table.types.logical.VariantType;
 import org.apache.flink.table.types.logical.YearMonthIntervalType;
 import org.apache.flink.table.types.logical.ZonedTimestampType;
 
@@ -257,6 +258,13 @@ public final class LogicalTypeDataTypeConverter {
         @Override
         public DataType visit(DescriptorType descriptorType) {
             return new AtomicDataType(descriptorType);
+        }
+
+        @Override
+        public DataType visit(VariantType variantType) {
+            // todo：here is Different with structuredType & rowType
+            // point： when new structuredType or rowType set field direct
+            return new AtomicDataType(variantType);
         }
 
         @Override
