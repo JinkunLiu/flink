@@ -20,6 +20,7 @@ package org.apache.flink.table.types.inference.strategies;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.table.functions.FunctionDefinition;
+import org.apache.flink.table.types.AtomicDataType;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.KeyValueDataType;
 import org.apache.flink.table.types.inference.ArgumentTypeStrategy;
@@ -29,6 +30,7 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.VariantType;
 import org.apache.flink.table.types.logical.utils.LogicalTypeCasts;
 
 import java.util.List;
@@ -86,12 +88,16 @@ public final class ItemAtIndexArgumentTypeStrategy implements ArgumentTypeStrate
             }
         }
 
+        if (collectionType.is(LogicalTypeRoot.VARIANT)) {
+            return Optional.of(new AtomicDataType(new VariantType()));
+        }
+
         return Optional.empty();
     }
 
     @Override
     public Signature.Argument getExpectedArgument(
             FunctionDefinition functionDefinition, int argumentPos) {
-        return Signature.Argument.of("[<INTEGER NUMERIC> | <MAP_KEY_TYPE>]");
+        return Signature.Argument.of("[<INTEGER NUMERIC> | <MAP_KEY_TYPE> | <CHARACTER STRING>]");
     }
 }
