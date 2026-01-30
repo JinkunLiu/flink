@@ -1018,7 +1018,7 @@ SqlAlterTable SqlAlterTable() :
                             startPos.plus(getPos()),
                             tableIdentifier,
                             new SqlNodeList(
-                                Collections.singletonList(columnName),
+                                List.of(columnName),
                                 getPos()),
                             ifExists);
             }
@@ -2041,6 +2041,7 @@ SqlAlterMaterializedTable SqlAlterMaterializedTable() :
     SqlNodeList partSpec = SqlNodeList.EMPTY;
     SqlNode freshness = null;
     SqlNode asQuery = null;
+    SqlIdentifier constraintName;
     AlterTableSchemaContext ctx = new AlterTableSchemaContext();
 }
 {
@@ -2133,7 +2134,7 @@ SqlAlterMaterializedTable SqlAlterMaterializedTable() :
             }
         |
         <ADD>
-            (
+        (
             <DISTRIBUTION> {
                 return new SqlAlterMaterializedTableAddDistribution(
                 startPos.plus(getPos()),
@@ -2158,18 +2159,77 @@ SqlAlterMaterializedTable SqlAlterMaterializedTable() :
               ctx.watermark);
         }
         |
-        <MODIFY> <DISTRIBUTION> {
-            return new SqlAlterMaterializedTableModifyDistribution(
-              startPos.plus(getPos()),
-              tableIdentifier,
-              SqlDistribution(getPos()));
+        <MODIFY>
+        (
+          <DISTRIBUTION> {
+          return new SqlAlterMaterializedTableModifyDistribution(
+            startPos.plus(getPos()),
+            tableIdentifier, SqlDistribution(getPos()));
         }
         |
-        <DROP> <DISTRIBUTION> {
+            AlterTableAddOrModify(ctx)
+        |
+            <LPAREN>
+            AlterTableAddOrModify(ctx)
+            (
+                <COMMA> AlterTableAddOrModify(ctx)
+            )*
+            <RPAREN>
+        )
+        {
+          return new SqlAlterMaterializedTableModifySchema(
+            startPos.plus(getPos()),
+            tableIdentifier,
+            new SqlNodeList(ctx.columnPositions, startPos.plus(getPos())),
+            ctx.constraints,
+            ctx.watermark);
+        }
+        |
+        <DROP>
+            (
+                { SqlIdentifier columnName = null; }
+                columnName = CompoundIdentifier() {
+                  return new SqlAlterMaterializedTableDropColumn(
+                    startPos.plus(getPos()),
+                    tableIdentifier,
+                    new SqlNodeList(
+                      List.of(columnName),
+                      getPos()));
+                }
+            |
+                { Pair<SqlNodeList, SqlNodeList> columnWithTypePair = null; }
+                columnWithTypePair = ParenthesizedCompoundIdentifierList() {
+                  return new SqlAlterMaterializedTableDropColumn(
+                    startPos.plus(getPos()),
+                    tableIdentifier,
+                    columnWithTypePair.getKey());
+                }
+            |
+            <DISTRIBUTION> {
                 return new SqlAlterMaterializedTableDropDistribution(
-                startPos.plus(getPos()),
-                tableIdentifier);
+                  startPos.plus(getPos()),
+                  tableIdentifier);
             }
+            |
+            <PRIMARY> <KEY> {
+                return new SqlAlterMaterializedTableDropPrimaryKey(
+                  startPos.plus(getPos()),
+                  tableIdentifier);
+            }
+            |
+            <CONSTRAINT> constraintName = SimpleIdentifier() {
+                return new SqlAlterMaterializedTableDropConstraint(
+                  startPos.plus(getPos()),
+                  tableIdentifier,
+                  constraintName);
+                }
+            |
+            <WATERMARK> {
+                return new SqlAlterMaterializedTableDropWatermark(
+                  startPos.plus(getPos()),
+                  tableIdentifier);
+            }
+        )
     )
 }
 

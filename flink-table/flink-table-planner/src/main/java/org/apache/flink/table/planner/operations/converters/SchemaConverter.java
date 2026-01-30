@@ -227,7 +227,8 @@ public abstract class SchemaConverter {
         for (SqlNode alterColumn : alterColumns) {
             SqlTableColumnPosition columnPosition = (SqlTableColumnPosition) alterColumn;
             SqlTableColumn column = columnPosition.getColumn();
-            String columnName = getColumnName(column.getName());
+            String columnName =
+                    OperationConverterUtils.extractSimpleColumnName(column.getName(), exMsgPrefix);
             if (!alterColNames.add(columnName)) {
                 throw new ValidationException(
                         String.format(
@@ -241,11 +242,8 @@ public abstract class SchemaConverter {
         SqlIdentifier referencedIdent = columnPosition.getAfterReferencedColumn();
         Preconditions.checkNotNull(
                 referencedIdent, String.format("%sCould not refer to a null column", exMsgPrefix));
-        if (!referencedIdent.isSimple()) {
-            throw new UnsupportedOperationException(
-                    String.format("%sAlter nested row type is not supported yet.", exMsgPrefix));
-        }
-        String referencedName = referencedIdent.getSimple();
+        String referencedName =
+                OperationConverterUtils.extractSimpleColumnName(referencedIdent, exMsgPrefix);
         if (!sortedColumnNames.contains(referencedName)) {
             throw new ValidationException(
                     String.format(
@@ -298,16 +296,6 @@ public abstract class SchemaConverter {
     protected abstract void checkAndCollectPrimaryKeyChange();
 
     protected abstract void checkAndCollectWatermarkChange();
-
-    protected String getColumnName(SqlIdentifier identifier) {
-        if (!identifier.isSimple()) {
-            throw new UnsupportedOperationException(
-                    String.format(
-                            "%sAlter nested row type %s is not supported yet.",
-                            exMsgPrefix, identifier));
-        }
-        return identifier.getSimple();
-    }
 
     protected <T> T unwrap(Optional<T> value) {
         return value.orElseThrow(() -> new TableException("The value should never be empty."));

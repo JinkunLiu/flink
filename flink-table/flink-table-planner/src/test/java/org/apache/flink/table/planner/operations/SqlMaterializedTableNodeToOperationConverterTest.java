@@ -59,7 +59,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -94,7 +93,7 @@ class SqlMaterializedTableNodeToOperationConverterTest
                 CatalogTable.newBuilder()
                         .schema(tableSchema)
                         .comment("")
-                        .partitionKeys(Arrays.asList("b", "c"))
+                        .partitionKeys(List.of("b", "c"))
                         .options(options)
                         .build();
         catalog.createTable(path3, catalogTable, true);
@@ -133,6 +132,26 @@ class SqlMaterializedTableNodeToOperationConverterTest
                         + "AS SELECT t1.* FROM t1";
         createMaterializedTableInCatalog(sqlWithWatermark, "base_mtbl_with_watermark");
 
+        // MATERIALIZED TABLE with METADATA column and distribution
+        final String sqlWithMetadataColumn =
+                "CREATE MATERIALIZED TABLE base_mtbl_with_metadata (\n"
+                        + "   t AS current_timestamp,"
+                        + "   m STRING METADATA VIRTUAL,"
+                        + "   m_p STRING METADATA,"
+                        + "   CONSTRAINT ct1 PRIMARY KEY(a) NOT ENFORCED,"
+                        + "   WATERMARK FOR t as current_timestamp - INTERVAL '5' SECOND"
+                        + ")\n"
+                        + "COMMENT 'materialized table comment'\n"
+                        + "DISTRIBUTED BY HASH (b) INTO 7 BUCKETS\n"
+                        + "WITH (\n"
+                        + "  'connector' = 'filesystem', \n"
+                        + "  'format' = 'json'\n"
+                        + ")\n"
+                        + "FRESHNESS = INTERVAL '30' SECOND\n"
+                        + "REFRESH_MODE = FULL\n"
+                        + "AS SELECT t1.* FROM t1";
+        createMaterializedTableInCatalog(sqlWithMetadataColumn, "base_mtbl_with_metadata");
+
         // MATERIALIZED TABLE without constraint
         final String sqlWithoutConstraint =
                 "CREATE MATERIALIZED TABLE base_mtbl_without_constraint "
@@ -147,6 +166,18 @@ class SqlMaterializedTableNodeToOperationConverterTest
                         + "AS SELECT t1.* FROM t1";
 
         createMaterializedTableInCatalog(sqlWithoutConstraint, "base_mtbl_without_constraint");
+
+        // MATERIALIZED TABLE with non persisted columns
+        final String sqlWithNonPersisted =
+                "CREATE MATERIALIZED TABLE base_mtbl_with_non_persisted (\n"
+                        + "   m STRING METADATA VIRTUAL,"
+                        + "   calc AS 'a' || 'b'"
+                        + ")\n"
+                        + "FRESHNESS = INTERVAL '30' SECOND\n"
+                        + "REFRESH_MODE = FULL\n"
+                        + "AS SELECT 1";
+
+        createMaterializedTableInCatalog(sqlWithNonPersisted, "base_mtbl_with_non_persisted");
     }
 
     @Test
@@ -352,8 +383,8 @@ class SqlMaterializedTableNodeToOperationConverterTest
     }
 
     @ParameterizedTest
-    @MethodSource("testDataForCreateMaterializedTableFailedCase")
-    void createMaterializedTableFailedCase(TestSpec spec) {
+    @MethodSource("testDataForCreateAlterMaterializedTableFailedCase")
+    void createAlterMaterializedTableFailedCase(TestSpec spec) {
         assertThatThrownBy(() -> parse(spec.sql))
                 .as(spec.sql)
                 .isInstanceOf(spec.expectedException)
@@ -483,15 +514,12 @@ class SqlMaterializedTableNodeToOperationConverterTest
         AlterMaterializedTableAsQueryOperation op =
                 (AlterMaterializedTableAsQueryOperation) operation;
         assertThat(op.getTableChanges())
-                .isEqualTo(
-                        Arrays.asList(
-                                TableChange.add(
-                                        Column.physical("e", DataTypes.VARCHAR(Integer.MAX_VALUE))),
-                                TableChange.add(
-                                        Column.physical("f", DataTypes.VARCHAR(Integer.MAX_VALUE))),
-                                TableChange.modifyDefinitionQuery(
-                                        "SELECT `t3`.`a`, `t3`.`b`, `t3`.`c`, `t3`.`d`, `t3`.`d` AS `e`, CAST('123' AS STRING) AS `f`\n"
-                                                + "FROM `builtin`.`default`.`t3` AS `t3`")));
+                .containsExactly(
+                        TableChange.add(Column.physical("e", DataTypes.VARCHAR(Integer.MAX_VALUE))),
+                        TableChange.add(Column.physical("f", DataTypes.VARCHAR(Integer.MAX_VALUE))),
+                        TableChange.modifyDefinitionQuery(
+                                "SELECT `t3`.`a`, `t3`.`b`, `t3`.`c`, `t3`.`d`, `t3`.`d` AS `e`, CAST('123' AS STRING) AS `f`\n"
+                                        + "FROM `builtin`.`default`.`t3` AS `t3`"));
         assertThat(operation.asSummaryString())
                 .isEqualTo(
                         "ALTER MATERIALIZED TABLE builtin.default.base_mtbl AS SELECT `t3`.`a`, `t3`.`b`, `t3`.`c`, `t3`.`d`, `t3`.`d` AS `e`, CAST('123' AS STRING) AS `f`\n"
@@ -527,12 +555,11 @@ class SqlMaterializedTableNodeToOperationConverterTest
                         .collect(Collectors.toList());
         // added column should be a nullable column.
         assertThat(addedColumn)
-                .isEqualTo(
-                        Arrays.asList(
-                                new Schema.UnresolvedPhysicalColumn(
-                                        "e", DataTypes.VARCHAR(Integer.MAX_VALUE)),
-                                new Schema.UnresolvedPhysicalColumn(
-                                        "f", DataTypes.VARCHAR(Integer.MAX_VALUE))));
+                .containsExactly(
+                        new Schema.UnresolvedPhysicalColumn(
+                                "e", DataTypes.VARCHAR(Integer.MAX_VALUE)),
+                        new Schema.UnresolvedPhysicalColumn(
+                                "f", DataTypes.VARCHAR(Integer.MAX_VALUE)));
     }
 
     @Test
@@ -542,12 +569,11 @@ class SqlMaterializedTableNodeToOperationConverterTest
                 (AlterMaterializedTableAsQueryOperation) parse(sql5);
 
         assertThat(sqlAlterMaterializedTableAsQuery.getTableChanges())
-                .isEqualTo(
-                        Arrays.asList(
-                                TableChange.add(Column.physical("a0", DataTypes.INT())),
-                                TableChange.modifyDefinitionQuery(
-                                        "SELECT `t3`.`a`, `t3`.`b`, `t3`.`c`, `t3`.`d`, `t3`.`c` AS `a`\n"
-                                                + "FROM `builtin`.`default`.`t3` AS `t3`")));
+                .containsExactly(
+                        TableChange.add(Column.physical("a0", DataTypes.INT())),
+                        TableChange.modifyDefinitionQuery(
+                                "SELECT `t3`.`a`, `t3`.`b`, `t3`.`c`, `t3`.`d`, `t3`.`c` AS `a`\n"
+                                        + "FROM `builtin`.`default`.`t3` AS `t3`"));
     }
 
     @Test
@@ -628,15 +654,12 @@ class SqlMaterializedTableNodeToOperationConverterTest
         AlterMaterializedTableAsQueryOperation op =
                 (AlterMaterializedTableAsQueryOperation) operation;
         assertThat(op.getTableChanges())
-                .isEqualTo(
-                        Arrays.asList(
-                                TableChange.add(
-                                        Column.physical("e", DataTypes.VARCHAR(Integer.MAX_VALUE))),
-                                TableChange.add(
-                                        Column.physical("f", DataTypes.VARCHAR(Integer.MAX_VALUE))),
-                                TableChange.modifyDefinitionQuery(
-                                        "SELECT `t3`.`a`, `t3`.`b`, `t3`.`c`, `t3`.`d`, `t3`.`d` AS `e`, CAST('123' AS STRING) AS `f`\n"
-                                                + "FROM `builtin`.`default`.`t3` AS `t3`")));
+                .containsExactly(
+                        TableChange.add(Column.physical("e", DataTypes.VARCHAR(Integer.MAX_VALUE))),
+                        TableChange.add(Column.physical("f", DataTypes.VARCHAR(Integer.MAX_VALUE))),
+                        TableChange.modifyDefinitionQuery(
+                                "SELECT `t3`.`a`, `t3`.`b`, `t3`.`c`, `t3`.`d`, `t3`.`d` AS `e`, CAST('123' AS STRING) AS `f`\n"
+                                        + "FROM `builtin`.`default`.`t3` AS `t3`"));
         assertThat(operation.asSummaryString())
                 .isEqualTo(
                         "ALTER MATERIALIZED TABLE builtin.default.base_mtbl AS SELECT `t3`.`a`, `t3`.`b`, `t3`.`c`, `t3`.`d`, `t3`.`d` AS `e`, CAST('123' AS STRING) AS `f`\n"
@@ -672,21 +695,22 @@ class SqlMaterializedTableNodeToOperationConverterTest
                         .collect(Collectors.toList());
         // added column should be a nullable column.
         assertThat(addedColumn)
-                .isEqualTo(
-                        Arrays.asList(
-                                new Schema.UnresolvedPhysicalColumn(
-                                        "e", DataTypes.VARCHAR(Integer.MAX_VALUE)),
-                                new Schema.UnresolvedPhysicalColumn(
-                                        "f", DataTypes.VARCHAR(Integer.MAX_VALUE))));
+                .containsExactly(
+                        new Schema.UnresolvedPhysicalColumn(
+                                "e", DataTypes.VARCHAR(Integer.MAX_VALUE)),
+                        new Schema.UnresolvedPhysicalColumn(
+                                "f", DataTypes.VARCHAR(Integer.MAX_VALUE)));
     }
 
-    private static Collection<TestSpec> testDataForCreateMaterializedTableFailedCase() {
+    private static Collection<TestSpec> testDataForCreateAlterMaterializedTableFailedCase() {
         final Collection<TestSpec> list = new ArrayList<>();
         list.addAll(createWithInvalidSchema());
         list.addAll(createWithInvalidFreshness());
         list.addAll(createWithInvalidPartitions());
-        list.addAll(alterWithInvalidSchema());
+        list.addAll(alterAddWithInvalidSchema());
+        list.addAll(alterModifyWithInvalidSchema());
         list.addAll(alterQuery());
+        list.addAll(alterDrop());
         return list;
     }
 
@@ -724,7 +748,7 @@ class SqlMaterializedTableNodeToOperationConverterTest
                         "ALTER MATERIALIZED TABLE for a table is not allowed"));
     }
 
-    private static List<TestSpec> alterWithInvalidSchema() {
+    private static List<TestSpec> alterAddWithInvalidSchema() {
         return List.of(
                 TestSpec.of(
                         "ALTER MATERIALIZED TABLE base_mtbl ADD WATERMARK for invalid_column as invalid_column",
@@ -765,6 +789,63 @@ class SqlMaterializedTableNodeToOperationConverterTest
                                 + "Invalid schema change. All persisted (physical and metadata) "
                                 + "columns in the schema part need to be present in the query part.\n"
                                 + "However, metadata persisted column `m1` could not be found in the query."));
+    }
+
+    private static List<TestSpec> alterModifyWithInvalidSchema() {
+        return List.of(
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl MODIFY WATERMARK for invalid_column as invalid_column",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "The current materialized table does not define any watermark. You might want to add a new one."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_watermark MODIFY WATERMARK for invalid_column as current_timestamp - INTERVAL '2' SECOND",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Invalid column name 'invalid_column' for rowtime attribute in watermark declaration. Available columns are: [t, a, b, c, d]"),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl MODIFY `physical_not_used_in_query` BIGINT NOT NULL",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Invalid schema change. All persisted (physical and metadata) "
+                                + "columns in the schema part need to be present in the query part.\n"
+                                + "However, physical column `physical_not_used_in_query` could not be found in the query."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl MODIFY `not_existed_column` BIGINT NOT NULL",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Invalid schema change. All persisted (physical and metadata) columns in the schema part need to be present in the query part.\n"
+                                + "However, physical column `not_existed_column` could not be found in the query."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl MODIFY `a` AS `non_existing_column` + 2",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Invalid expression for computed column 'a'."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl MODIFY `c` AS current_timestamp",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Changing of physical column 'c' to computed column is not supported"),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl MODIFY PRIMARY KEY(not_existed) NOT ENFORCED",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Invalid primary key 'PK_not_existed'. Column 'not_existed' does not exist."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl MODIFY (`a` AS current_timestamp AFTER `q2`, `q2` AS current_timestamp AFTER `q`)",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Referenced column `q2` by 'AFTER' does not exist in the table."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl MODIFY `m1` INT METADATA",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Invalid schema change. All persisted (physical and metadata) "
+                                + "columns in the schema part need to be present in the query part.\n"
+                                + "However, metadata persisted column `m1` could not be found in the query."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_metadata MODIFY `m` AS current_timestamp",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Changing of metadata column 'm' to computed column is not supported."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl MODIFY `c` STRING",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Column 'c' with type INT can not be changed to type STRING."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_metadata MODIFY `t` AS LTRIM(5)",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Invalid expression for computed column 't'."));
     }
 
     private static List<TestSpec> createWithInvalidSchema() {
@@ -915,7 +996,68 @@ class SqlMaterializedTableNodeToOperationConverterTest
                         "Materialized table freshness only support SECOND, MINUTE, HOUR, DAY as the time unit."));
     }
 
+    private static Collection<TestSpec> alterDrop() {
+        return List.of(
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl DROP WATERMARK",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "The current materialized table does not define any watermark strategy."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl_without_constraint DROP PRIMARY KEY",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "The current materialized table does not define any primary key."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl DROP CONSTRAINT invalid_constraint_name",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "The current materialized table does not define a primary key constraint named 'invalid_constraint_name'. Available constraint name: ['ct1']."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl DROP invalid_column_name",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "The column `invalid_column_name` does not exist in the base table."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl DROP invalid_column_name",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "The column `invalid_column_name` does not exist in the base table."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl DROP (a, b, a)",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Duplicate column `a`."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl DROP a",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "The column `a` is used as the partition keys."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_metadata DROP a",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "The column `a` is used as the primary key."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_metadata DROP b",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "The column `b` is used as a distribution key."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_metadata DROP t",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "The column `t` is referenced by watermark expression."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_metadata DROP d",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "Column(s) ('d') are used in query."),
+                TestSpec.of(
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_metadata DROP m_p",
+                        "Failed to execute ALTER MATERIALIZED TABLE statement.\n"
+                                + "The column `m_p` is a persisted column. Dropping of persisted columns is not supported."));
+    }
+
     private static Collection<TestSpec> alterSuccessCase() {
+        List<TestSpec> list = new ArrayList<>();
+        list.addAll(alterAddSchemaSuccessCase());
+        list.addAll(alterModifySchemaSuccessCase());
+        list.addAll(alterDropSchemaSuccessCase());
+        list.addAll(alterQuerySuccessCase());
+        return list;
+    }
+
+    private static Collection<TestSpec> alterAddSchemaSuccessCase() {
         final Collection<TestSpec> list = new ArrayList<>();
         list.add(
                 TestSpec.withExpectedSchema(
@@ -952,11 +1094,122 @@ class SqlMaterializedTableNodeToOperationConverterTest
                                 + "  `c1` AS [CURRENT_TIMESTAMP],\n"
                                 + "  `a` BIGINT NOT NULL,\n"
                                 + "  `b` STRING,\n"
-                                + "  `topic` METADATA VIRTUAL COMMENT 'kafka topic',\n"
+                                + "  `topic` STRING METADATA VIRTUAL COMMENT 'kafka topic',\n"
                                 + "  `c` INT,\n"
                                 + "  `d` STRING,\n"
                                 + "  WATERMARK FOR `c1` AS [`c1` - INTERVAL '1' SECOND],\n"
                                 + "  CONSTRAINT `PK_a` PRIMARY KEY (`a`) NOT ENFORCED\n"
+                                + ")"));
+        return list;
+    }
+
+    private static Collection<TestSpec> alterModifySchemaSuccessCase() {
+        final Collection<TestSpec> list = new ArrayList<>();
+        list.add(
+                TestSpec.withExpectedSchema(
+                        "ALTER MATERIALIZED TABLE base_mtbl MODIFY (`c` BIGINT AFTER `b`, `b` STRING COMMENT 'new comment')",
+                        "(\n"
+                                + "  `a` BIGINT NOT NULL,\n"
+                                + "  `b` STRING COMMENT 'new comment',\n"
+                                + "  `c` BIGINT,\n"
+                                + "  `d` STRING,\n"
+                                + "  CONSTRAINT `ct1` PRIMARY KEY (`a`) NOT ENFORCED\n"
+                                + ")"));
+        list.add(
+                TestSpec.withExpectedSchema(
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_metadata MODIFY (WATERMARK FOR t as current_timestamp - INTERVAL '1' SECOND)",
+                        "(\n"
+                                + "  `t` AS [CURRENT_TIMESTAMP],\n"
+                                + "  `m` STRING METADATA VIRTUAL,\n"
+                                + "  `m_p` STRING METADATA,\n"
+                                + "  `a` BIGINT NOT NULL,\n"
+                                + "  `b` STRING,\n"
+                                + "  `c` INT,\n"
+                                + "  `d` STRING,\n"
+                                + "  WATERMARK FOR `t` AS [CURRENT_TIMESTAMP - INTERVAL '1' SECOND],\n"
+                                + "  CONSTRAINT `ct1` PRIMARY KEY (`a`) NOT ENFORCED\n"
+                                + ")"));
+        return list;
+    }
+
+    private static Collection<TestSpec> alterDropSchemaSuccessCase() {
+        final Collection<TestSpec> list = new ArrayList<>();
+        list.add(
+                TestSpec.withExpectedSchema(
+                        "ALTER MATERIALIZED TABLE base_mtbl DROP PRIMARY KEY",
+                        "(\n"
+                                + "  `a` BIGINT NOT NULL,\n"
+                                + "  `b` STRING,\n"
+                                + "  `c` INT,\n"
+                                + "  `d` STRING\n"
+                                + ")"));
+        list.add(
+                TestSpec.withExpectedSchema(
+                        "ALTER MATERIALIZED TABLE base_mtbl DROP CONSTRAINT ct1",
+                        "(\n"
+                                + "  `a` BIGINT NOT NULL,\n"
+                                + "  `b` STRING,\n"
+                                + "  `c` INT,\n"
+                                + "  `d` STRING\n"
+                                + ")"));
+        list.add(
+                TestSpec.withExpectedSchema(
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_watermark DROP WATERMARK",
+                        "(\n"
+                                + "  `t` AS [CURRENT_TIMESTAMP],\n"
+                                + "  `a` BIGINT NOT NULL,\n"
+                                + "  `b` STRING,\n"
+                                + "  `c` INT,\n"
+                                + "  `d` STRING,\n"
+                                + "  CONSTRAINT `ct1` PRIMARY KEY (`a`) NOT ENFORCED\n"
+                                + ")"));
+        list.add(
+                TestSpec.withExpectedSchema(
+                        // drop metadata virtual column
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_metadata DROP m",
+                        "(\n"
+                                + "  `t` AS [CURRENT_TIMESTAMP],\n"
+                                + "  `m_p` STRING METADATA,\n"
+                                + "  `a` BIGINT NOT NULL,\n"
+                                + "  `b` STRING,\n"
+                                + "  `c` INT,\n"
+                                + "  `d` STRING,\n"
+                                + "  WATERMARK FOR `t` AS [CURRENT_TIMESTAMP - INTERVAL '5' SECOND],\n"
+                                + "  CONSTRAINT `ct1` PRIMARY KEY (`a`) NOT ENFORCED\n"
+                                + ")"));
+        return list;
+    }
+
+    private static Collection<TestSpec> alterQuerySuccessCase() {
+        final Collection<TestSpec> list = new ArrayList<>();
+
+        list.add(
+                TestSpec.withExpectedSchema(
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_non_persisted AS SELECT 1",
+                        "(\n"
+                                + "  `m` STRING METADATA VIRTUAL,\n"
+                                + "  `calc` AS 'a' || 'b',\n"
+                                + "  `EXPR$0` INT NOT NULL\n"
+                                + ")"));
+
+        list.add(
+                TestSpec.withExpectedSchema(
+                        "ALTER MATERIALIZED TABLE base_mtbl_with_non_persisted AS SELECT 2, 'a' AS sec",
+                        "(\n"
+                                + "  `m` STRING METADATA VIRTUAL,\n"
+                                + "  `calc` AS 'a' || 'b',\n"
+                                + "  `EXPR$0` INT NOT NULL,\n"
+                                + "  `sec` CHAR(1)\n"
+                                + ")"));
+
+        list.add(
+                TestSpec.withExpectedSchema(
+                        "CREATE OR ALTER MATERIALIZED TABLE base_mtbl_with_non_persisted AS SELECT 2, 'a' AS sec",
+                        "(\n"
+                                + "  `m` STRING METADATA VIRTUAL,\n"
+                                + "  `calc` AS 'a' || 'b',\n"
+                                + "  `EXPR$0` INT NOT NULL,\n"
+                                + "  `sec` CHAR(1)\n"
                                 + ")"));
         return list;
     }
@@ -1043,7 +1296,7 @@ class SqlMaterializedTableNodeToOperationConverterTest
                                 .build())
                 .comment("materialized table comment")
                 .options(Map.of("connector", "filesystem", "format", "json"))
-                .partitionKeys(Arrays.asList("a", "d"))
+                .partitionKeys(List.of("a", "d"))
                 .originalQuery("SELECT *\nFROM `t1`")
                 .expandedQuery(
                         "SELECT `t1`.`a`, `t1`.`b`, `t1`.`c`, `t1`.`d`\n"

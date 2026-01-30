@@ -33,3 +33,5 @@ export * from './task-manager';
 export * from './job-accumulators';
 export * from './job-manager';
 export * from './job-metrics';
+export * from './application-overview';
+export * from './application-detail';
