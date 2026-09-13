@@ -1423,7 +1423,11 @@ public abstract class BaseExpressions<InType, OutType> {
 
     public OutType variantGet(String path, DataType returnType) {
         return toApiSpecificExpression(
-                unresolvedCall(VARIANT_GET, toExpr(), valueLiteral(path), typeLiteral(returnType)));
+                unresolvedCall(
+                        VARIANT_GET,
+                        toExpr(),
+                        valueLiteral(path),
+                        valueLiteral(returnType.getLogicalType().asSerializableString())));
     }
 
     public OutType tryVariantGet(String path, DataType returnType) {

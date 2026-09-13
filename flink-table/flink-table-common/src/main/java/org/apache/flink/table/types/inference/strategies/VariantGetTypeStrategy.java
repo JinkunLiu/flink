@@ -37,6 +37,9 @@ class VariantGetTypeStrategy implements TypeStrategy {
         if (argumentDataTypes.size() == 2) {
             return Optional.of(DataTypes.VARIANT().nullable());
         }
-        return Optional.of(argumentDataTypes.get(2).nullable());
+        return callContext
+                .getArgumentValue(2, String.class)
+                .map(callContext.getDataTypeFactory()::createDataType)
+                .map(DataType::nullable);
     }
 }

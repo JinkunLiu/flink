@@ -20,11 +20,15 @@ package org.apache.flink.table.runtime.functions.scalar;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.data.StringData;
+import org.apache.flink.table.data.conversion.DataStructureConverter;
+import org.apache.flink.table.data.conversion.DataStructureConverters;
 import org.apache.flink.table.functions.BuiltInFunctionDefinitions;
 import org.apache.flink.table.functions.FunctionContext;
 import org.apache.flink.table.functions.SpecializedFunction;
 import org.apache.flink.table.runtime.functions.VariantGetUtils;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.types.variant.Variant;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -39,20 +43,26 @@ import static org.apache.flink.table.api.Expressions.$;
 public class VariantGetFunction extends BuiltInScalarFunction {
 
     private final @Nullable SpecializedFunction.ExpressionEvaluator castEvaluator;
+    private final @Nullable DataStructureConverter<Object, Object> castResultConverter;
     private transient @Nullable MethodHandle castHandle;
 
     public VariantGetFunction(SpecializedFunction.SpecializedContext context) {
         super(BuiltInFunctionDefinitions.VARIANT_GET, context);
 
-        if (getArgumentDataTypes().size() == 2) {
+        if (getOutputDataType().getLogicalType().is(LogicalTypeRoot.VARIANT)) {
             castEvaluator = null;
+            castResultConverter = null;
         } else {
-            final DataType targetType = getOutputDataType();
+            final DataType targetType =
+                    context.getCallContext()
+                            .getOutputDataType()
+                            .orElseThrow(IllegalStateException::new);
             castEvaluator =
                     context.createEvaluator(
                             $("value").cast(targetType),
                             targetType,
                             DataTypes.FIELD("value", DataTypes.VARIANT().toInternal()));
+            castResultConverter = DataStructureConverters.getConverter(targetType);
         }
     }
 
@@ -60,11 +70,13 @@ public class VariantGetFunction extends BuiltInScalarFunction {
     public void open(FunctionContext context) throws Exception {
         if (castEvaluator != null) {
             castHandle = castEvaluator.open(context);
+            castResultConverter.open(context.getUserCodeClassLoader());
         }
     }
 
-    public @Nullable Object eval(@Nullable Variant variant, @Nullable String path) {
-        final Variant extracted = VariantGetUtils.variantGet(variant, path);
+    public @Nullable Object eval(@Nullable Variant variant, @Nullable StringData path) {
+        final Variant extracted =
+                VariantGetUtils.variantGet(variant, path == null ? null : path.toString());
         if (extracted == null) {
             return null;
         }
@@ -73,10 +85,15 @@ public class VariantGetFunction extends BuiltInScalarFunction {
         }
 
         try {
-            return castHandle.invoke(extracted);
+            return castResultConverter.toInternalOrNull(castHandle.invoke(extracted)); // todo：liujinkun02，确认下段代码
         } catch (Throwable t) {
             throw new FlinkRuntimeException(t);
         }
+    }
+
+    public @Nullable Object eval(
+            @Nullable Variant variant, @Nullable StringData path, @Nullable StringData targetType) {
+        return eval(variant, path);
     }
 
     @Override
