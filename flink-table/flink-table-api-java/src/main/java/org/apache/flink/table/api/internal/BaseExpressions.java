@@ -1421,18 +1421,15 @@ public abstract class BaseExpressions<InType, OutType> {
                 unresolvedCall(TRY_PARSE_JSON, toExpr(), valueLiteral(allowDuplicateKeys)));
     }
 
-    public OutType variantGet(String path,
-                              DataType returnType) {
+    public OutType variantGet(String path, DataType returnType) {
         return toApiSpecificExpression(
-                unresolvedCall(VARIANT_GET, toExpr(), valueLiteral(path),
-                        typeLiteral(returnType)));
+                unresolvedCall(VARIANT_GET, toExpr(), valueLiteral(path), typeLiteral(returnType)));
     }
 
-    public OutType tryVariantGet(String path,
-                                 DataType returnType) {
+    public OutType tryVariantGet(String path, DataType returnType) {
         return toApiSpecificExpression(
-                unresolvedCall(TRY_VARIANT_GET, toExpr(), valueLiteral(path),
-                        typeLiteral(returnType)));
+                unresolvedCall(
+                        TRY_VARIANT_GET, toExpr(), valueLiteral(path), typeLiteral(returnType)));
     }
 
     /** Returns the base string decoded with base64. */

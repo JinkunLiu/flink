@@ -18,22 +18,60 @@
 
 package org.apache.flink.table.runtime.functions.scalar;
 
+import org.apache.flink.annotation.Internal;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.functions.BuiltInFunctionDefinitions;
+import org.apache.flink.table.functions.FunctionContext;
 import org.apache.flink.table.functions.SpecializedFunction;
 import org.apache.flink.table.runtime.functions.VariantGetUtils;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.variant.Variant;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import javax.annotation.Nullable;
 
+import java.lang.invoke.MethodHandle;
+
+import static org.apache.flink.table.api.Expressions.$;
+
 /** Implementation of {@link BuiltInFunctionDefinitions#VARIANT_GET}. */
+@Internal
 public class VariantGetFunction extends BuiltInScalarFunction {
+
+    private final SpecializedFunction.ExpressionEvaluator castEvaluator;
+    private transient MethodHandle castHandle;
 
     public VariantGetFunction(SpecializedFunction.SpecializedContext context) {
         super(BuiltInFunctionDefinitions.VARIANT_GET, context);
+
+        final DataType targetType = getOutputDataType();
+        castEvaluator =
+                context.createEvaluator(
+                        $("value").cast(targetType),
+                        targetType,
+                        DataTypes.FIELD("value", DataTypes.VARIANT().toInternal()));
     }
 
-    public @Nullable Object eval(@Nullable Variant variant, String path, DataType targetType) {
-        return VariantGetUtils.variantGet(variant, path);
+    @Override
+    public void open(FunctionContext context) throws Exception {
+        castHandle = castEvaluator.open(context);
+    }
+
+    public @Nullable Object eval(@Nullable Variant variant, @Nullable String path) {
+        final Variant extracted = VariantGetUtils.variantGet(variant, path);
+        if (extracted == null) {
+            return null;
+        }
+
+        try {
+            return castHandle.invoke(extracted);
+        } catch (Throwable t) {
+            throw new FlinkRuntimeException(t);
+        }
+    }
+
+    @Override
+    public void close() throws Exception {
+        castEvaluator.close();
     }
 }

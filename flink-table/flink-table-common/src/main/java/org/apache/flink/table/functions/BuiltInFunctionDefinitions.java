@@ -3181,14 +3181,18 @@ public final class BuiltInFunctionDefinitions {
                     .name("VARIANT_GET")
                     .kind(SCALAR)
                     .inputTypeStrategy(
-                            or(sequence(
+                            or(
+                                    sequence(
                                             logical(LogicalTypeRoot.VARIANT),
-                                            and(logical(LogicalTypeFamily.CHARACTER_STRING), LITERAL)),
-                            sequence(
-                                    logical(LogicalTypeRoot.VARIANT),
-                                    and(logical(LogicalTypeFamily.CHARACTER_STRING), LITERAL),
-                                    TYPE_LITERAL))
-                    )
+                                            and(
+                                                    logical(LogicalTypeFamily.CHARACTER_STRING),
+                                                    LITERAL)),
+                                    sequence(
+                                            logical(LogicalTypeRoot.VARIANT),
+                                            and(
+                                                    logical(LogicalTypeFamily.CHARACTER_STRING),
+                                                    LITERAL),
+                                            TYPE_LITERAL)))
                     .outputTypeStrategy(nullableIfArgs(argument(2)))
                     .runtimeClass(
                             "org.apache.flink.table.runtime.functions.scalar.VariantGetFunction")
@@ -3199,14 +3203,18 @@ public final class BuiltInFunctionDefinitions {
                     .name("TRY_VARIANT_GET")
                     .kind(SCALAR)
                     .inputTypeStrategy(
-                            or(sequence(
-                                            logical(LogicalTypeRoot.VARIANT),
-                                            and(logical(LogicalTypeFamily.CHARACTER_STRING), LITERAL)),
+                            or(
                                     sequence(
                                             logical(LogicalTypeRoot.VARIANT),
-                                            and(logical(LogicalTypeFamily.CHARACTER_STRING), LITERAL),
-                                            TYPE_LITERAL))
-                    )
+                                            and(
+                                                    logical(LogicalTypeFamily.CHARACTER_STRING),
+                                                    LITERAL)),
+                                    sequence(
+                                            logical(LogicalTypeRoot.VARIANT),
+                                            and(
+                                                    logical(LogicalTypeFamily.CHARACTER_STRING),
+                                                    LITERAL),
+                                            TYPE_LITERAL)))
                     .outputTypeStrategy(forceNullable(argument(2)))
                     .runtimeClass(
                             "org.apache.flink.table.runtime.functions.scalar.TryVariantGetFunction")
