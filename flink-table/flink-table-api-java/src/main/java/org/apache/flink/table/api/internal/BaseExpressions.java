@@ -234,10 +234,12 @@ import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.TRIM;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.TRUNCATE;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.TRY_CAST;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.TRY_PARSE_JSON;
+import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.TRY_VARIANT_GET;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.UNHEX;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.UPPER;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.URL_DECODE;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.URL_ENCODE;
+import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.VARIANT_GET;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.VAR_POP;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.VAR_SAMP;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.WINDOW_END;
@@ -1417,6 +1419,20 @@ public abstract class BaseExpressions<InType, OutType> {
     public OutType tryParseJson(boolean allowDuplicateKeys) {
         return toApiSpecificExpression(
                 unresolvedCall(TRY_PARSE_JSON, toExpr(), valueLiteral(allowDuplicateKeys)));
+    }
+
+    public OutType variantGet(String path,
+                              DataType returnType) {
+        return toApiSpecificExpression(
+                unresolvedCall(VARIANT_GET, toExpr(), valueLiteral(path),
+                        typeLiteral(returnType)));
+    }
+
+    public OutType tryVariantGet(String path,
+                                 DataType returnType) {
+        return toApiSpecificExpression(
+                unresolvedCall(TRY_VARIANT_GET, toExpr(), valueLiteral(path),
+                        typeLiteral(returnType)));
     }
 
     /** Returns the base string decoded with base64. */
