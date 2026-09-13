@@ -38,29 +38,38 @@ import static org.apache.flink.table.api.Expressions.$;
 @Internal
 public class VariantGetFunction extends BuiltInScalarFunction {
 
-    private final SpecializedFunction.ExpressionEvaluator castEvaluator;
-    private transient MethodHandle castHandle;
+    private final @Nullable SpecializedFunction.ExpressionEvaluator castEvaluator;
+    private transient @Nullable MethodHandle castHandle;
 
     public VariantGetFunction(SpecializedFunction.SpecializedContext context) {
         super(BuiltInFunctionDefinitions.VARIANT_GET, context);
 
-        final DataType targetType = getOutputDataType();
-        castEvaluator =
-                context.createEvaluator(
-                        $("value").cast(targetType),
-                        targetType,
-                        DataTypes.FIELD("value", DataTypes.VARIANT().toInternal()));
+        if (getArgumentDataTypes().size() == 2) {
+            castEvaluator = null;
+        } else {
+            final DataType targetType = getOutputDataType();
+            castEvaluator =
+                    context.createEvaluator(
+                            $("value").cast(targetType),
+                            targetType,
+                            DataTypes.FIELD("value", DataTypes.VARIANT().toInternal()));
+        }
     }
 
     @Override
     public void open(FunctionContext context) throws Exception {
-        castHandle = castEvaluator.open(context);
+        if (castEvaluator != null) {
+            castHandle = castEvaluator.open(context);
+        }
     }
 
     public @Nullable Object eval(@Nullable Variant variant, @Nullable String path) {
         final Variant extracted = VariantGetUtils.variantGet(variant, path);
         if (extracted == null) {
             return null;
+        }
+        if (castEvaluator == null) {
+            return extracted;
         }
 
         try {
@@ -72,6 +81,8 @@ public class VariantGetFunction extends BuiltInScalarFunction {
 
     @Override
     public void close() throws Exception {
-        castEvaluator.close();
+        if (castEvaluator != null) {
+            castEvaluator.close();
+        }
     }
 }

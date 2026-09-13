@@ -3193,7 +3193,7 @@ public final class BuiltInFunctionDefinitions {
                                                     logical(LogicalTypeFamily.CHARACTER_STRING),
                                                     LITERAL),
                                             TYPE_LITERAL)))
-                    .outputTypeStrategy(nullableIfArgs(argument(2)))
+                    .outputTypeStrategy(SpecificTypeStrategies.VARIANT_GET)
                     .runtimeClass(
                             "org.apache.flink.table.runtime.functions.scalar.VariantGetFunction")
                     .build();
@@ -3215,7 +3215,7 @@ public final class BuiltInFunctionDefinitions {
                                                     logical(LogicalTypeFamily.CHARACTER_STRING),
                                                     LITERAL),
                                             TYPE_LITERAL)))
-                    .outputTypeStrategy(forceNullable(argument(2)))
+                    .outputTypeStrategy(SpecificTypeStrategies.VARIANT_GET)
                     .runtimeClass(
                             "org.apache.flink.table.runtime.functions.scalar.TryVariantGetFunction")
                     .build();
