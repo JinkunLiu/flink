@@ -78,6 +78,10 @@ class VariantFunctionsITCase extends BuiltInFunctionTestBase {
                 .testTableApiRuntimeError(
                         $("f0").parseJson().variantGet("$[", STRING()), "Failed to parse this path")
                 .testSqlRuntimeError(
+                        "VARIANT_GET(PARSE_JSON(f1), '$[')", "Failed to parse this path")
+                .testTableApiRuntimeError(
+                        $("f1").parseJson().variantGet("$[", INT()), "Failed to parse this path")
+                .testSqlRuntimeError(
                         "VARIANT_GET(PARSE_JSON(f0), '$[')", "Failed to parse this path");
     }
 
@@ -148,6 +152,10 @@ class VariantFunctionsITCase extends BuiltInFunctionTestBase {
                 .testSqlValidationError(
                         "TRY_VARIANT_GET(PARSE_JSON(f0), '$.count', 'INT(')",
                         "Could not parse type")
+                .testSqlRuntimeError(
+                        "TRY_VARIANT_GET(PARSE_JSON(f1), '$[')", "Failed to parse this path")
+                .testTableApiRuntimeError(
+                        $("f1").parseJson().tryVariantGet("$[", INT()), "Failed to parse this path")
                 .testSqlRuntimeError(
                         "TRY_VARIANT_GET(PARSE_JSON(f0), '$[')", "Failed to parse this path")
                 .testTableApiRuntimeError(

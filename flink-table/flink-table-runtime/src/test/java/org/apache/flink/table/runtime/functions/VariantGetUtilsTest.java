@@ -19,6 +19,7 @@
 package org.apache.flink.table.runtime.functions;
 
 import org.apache.flink.table.api.TableRuntimeException;
+import org.apache.flink.table.runtime.functions.VariantGetUtils.ParsedPath;
 import org.apache.flink.types.variant.BinaryVariantBuilder;
 import org.apache.flink.types.variant.Variant;
 import org.apache.flink.types.variant.VariantBuilder;
@@ -43,14 +44,61 @@ class VariantGetUtilsTest {
     @Test
     void testRootPath() {
         final Variant variant = builder.object().add("name", builder.of("value")).build();
-        assertThat(VariantGetUtils.variantGet(variant, "$")).isSameAs(variant);
+        assertThat(VariantGetUtils.parsePath("$").extract(variant)).isSameAs(variant);
+    }
+
+    @Test
+    void testParsedPathReuse() {
+        final ParsedPath path = VariantGetUtils.parsePath("$.items[0].name");
+        final Variant first =
+                builder.object()
+                        .add(
+                                "items",
+                                builder.array()
+                                        .add(
+                                                builder.object()
+                                                        .add("name", builder.of("first"))
+                                                        .build())
+                                        .build())
+                        .build();
+        final Variant second =
+                builder.object()
+                        .add(
+                                "items",
+                                builder.array()
+                                        .add(
+                                                builder.object()
+                                                        .add("name", builder.of("second"))
+                                                        .build())
+                                        .build())
+                        .build();
+        assertThat(path.extract(first))
+                .isNotNull()
+                .satisfies(value -> assertThat(value.getString()).isEqualTo("first"));
+        assertThat(path.extract(null)).isNull();
+        assertThat(path.extract(builder.object().build())).isNull();
+        assertThat(path.extract(builder.of(1))).isNull();
+        assertThat(path.extract(second))
+                .isNotNull()
+                .satisfies(value -> assertThat(value.getString()).isEqualTo("second"));
+        assertThat(path.extract(first))
+                .isNotNull()
+                .satisfies(value -> assertThat(value.getString()).isEqualTo("first"));
+    }
+
+    @Test
+    void testParsedRootPath() {
+        final ParsedPath path = VariantGetUtils.parsePath("$");
+        final Variant value = builder.ofNull();
+        assertThat(path.extract(null)).isNull();
+        assertThat(path.extract(value)).isSameAs(value);
     }
 
     @ParameterizedTest
     @MethodSource("objectPaths")
     void testObjectField(String path, String expectedKey) {
         final Variant variant = builder.object().add(expectedKey, builder.of("value")).build();
-        assertThat(VariantGetUtils.variantGet(variant, path))
+        assertThat(VariantGetUtils.parsePath(path).extract(variant))
                 .isNotNull()
                 .satisfies(value -> assertThat(value.getString()).isEqualTo("value"));
     }
@@ -78,7 +126,7 @@ class VariantGetUtilsTest {
     void testArrayIndex(String path, int expectedValue) {
         final Variant variant =
                 builder.array().add(builder.of(10)).add(builder.of(20)).add(builder.of(30)).build();
-        assertThat(VariantGetUtils.variantGet(variant, path))
+        assertThat(VariantGetUtils.parsePath(path).extract(variant))
                 .isNotNull()
                 .satisfies(value -> assertThat(value.getInt()).isEqualTo(expectedValue));
     }
@@ -98,7 +146,7 @@ class VariantGetUtilsTest {
         final Variant items =
                 builder.array().add(builder.ofNull()).add(builder.of(0)).add(item).build();
         final Variant variant = builder.object().add("items", items).build();
-        assertThat(VariantGetUtils.variantGet(variant, "$.items[2]['a.b'][\"name\"]"))
+        assertThat(VariantGetUtils.parsePath("$.items[2]['a.b'][\"name\"]").extract(variant))
                 .isNotNull()
                 .satisfies(value -> assertThat(value.getString()).isEqualTo("value"));
     }
@@ -108,51 +156,46 @@ class VariantGetUtilsTest {
         final Variant item = builder.object().add("name", builder.of("value")).build();
         final Variant nested = builder.array().add(builder.ofNull()).add(item).build();
         final Variant variant = builder.array().add(nested).build();
-        assertThat(VariantGetUtils.variantGet(variant, "$[0][1].name"))
+        assertThat(VariantGetUtils.parsePath("$[0][1].name").extract(variant))
                 .isNotNull()
                 .satisfies(value -> assertThat(value.getString()).isEqualTo("value"));
     }
 
     @Test
     void testNullInput() {
-        assertThat(VariantGetUtils.variantGet(null, "$.name")).isNull();
-    }
-
-    @Test
-    void testNullPath() {
-        assertThat(VariantGetUtils.variantGet(builder.of(1), null)).isNull();
+        assertThat(VariantGetUtils.parsePath("$.name").extract(null)).isNull();
     }
 
     @Test
     void testVariantNull() {
         final Variant value = builder.ofNull();
-        assertThat(VariantGetUtils.variantGet(value, "$")).isSameAs(value);
+        assertThat(VariantGetUtils.parsePath("$").extract(value)).isSameAs(value);
         final Variant variant = builder.object().add("value", value).build();
-        assertThat(VariantGetUtils.variantGet(variant, "$.value"))
+        assertThat(VariantGetUtils.parsePath("$.value").extract(variant))
                 .isNotNull()
                 .satisfies(result -> assertThat(result.isNull()).isTrue());
-        assertThat(VariantGetUtils.variantGet(variant, "$.value.name")).isNull();
+        assertThat(VariantGetUtils.parsePath("$.value.name").extract(variant)).isNull();
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"$.missing", "$.missing.name", "$.missing[0]"})
     void testMissingField(String path) {
-        assertThat(VariantGetUtils.variantGet(builder.object().build(), path)).isNull();
+        assertThat(VariantGetUtils.parsePath(path).extract(builder.object().build())).isNull();
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"$[1]", "$[123]", "$[2147483647]", "$[1].name", "$[1][0]"})
     void testArrayIndexOutOfBounds(String path) {
         final Variant variant = builder.array().add(builder.of(10)).build();
-        assertThat(VariantGetUtils.variantGet(variant, path)).isNull();
+        assertThat(VariantGetUtils.parsePath(path).extract(variant)).isNull();
     }
 
     @Test
     void testContainerTypeMismatch() {
-        assertThat(VariantGetUtils.variantGet(builder.object().build(), "$[0]")).isNull();
-        assertThat(VariantGetUtils.variantGet(builder.array().build(), "$.name")).isNull();
-        assertThat(VariantGetUtils.variantGet(builder.of(1), "$.name")).isNull();
-        assertThat(VariantGetUtils.variantGet(builder.of(1), "$[0]")).isNull();
+        assertThat(VariantGetUtils.parsePath("$[0]").extract(builder.object().build())).isNull();
+        assertThat(VariantGetUtils.parsePath("$.name").extract(builder.array().build())).isNull();
+        assertThat(VariantGetUtils.parsePath("$.name").extract(builder.of(1))).isNull();
+        assertThat(VariantGetUtils.parsePath("$[0]").extract(builder.of(1))).isNull();
     }
 
     @Test
@@ -160,11 +203,11 @@ class VariantGetUtilsTest {
         final Variant item = builder.object().add("name", builder.of("value")).build();
         final Variant items = builder.array().add(item).build();
         final Variant variant = builder.object().add("items", items).build();
-        assertThat(VariantGetUtils.variantGet(variant, "$.items"))
+        assertThat(VariantGetUtils.parsePath("$.items").extract(variant))
                 .isNotNull()
                 .satisfies(
                         result -> assertThat(result.toJson()).isEqualTo("[{\"name\":\"value\"}]"));
-        assertThat(VariantGetUtils.variantGet(variant, "$.items[0]"))
+        assertThat(VariantGetUtils.parsePath("$.items[0]").extract(variant))
                 .isNotNull()
                 .satisfies(result -> assertThat(result.toJson()).isEqualTo("{\"name\":\"value\"}"));
     }
@@ -209,7 +252,7 @@ class VariantGetUtilsTest {
                 "$.items[2]['name']?"
             })
     void testInvalidPath(String path) {
-        assertThatThrownBy(() -> VariantGetUtils.variantGet(builder.object().build(), path))
+        assertThatThrownBy(() -> VariantGetUtils.parsePath(path))
                 .isInstanceOf(TableRuntimeException.class)
                 .hasMessage("Failed to parse this path: %s", path);
     }

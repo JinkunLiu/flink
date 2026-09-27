@@ -52,41 +52,51 @@ public final class VariantGetUtils {
     private VariantGetUtils() {}
 
     /**
-     * Extracts a sub-variant at the given path. The root path {@code $} returns the input itself.
-     *
-     * <p>Null arguments, missing fields, out-of-bounds indices, and container type mismatches
-     * return null. An explicit VARIANT null is preserved when it is the extracted value.
+     * Parses a path for reuse across input values.
      *
      * @throws TableRuntimeException if the path is invalid
      */
-    public static @Nullable Variant variantGet(@Nullable Variant variant, @Nullable String path) {
-        if (variant == null || path == null) {
-            return null;
-        }
-
-        final List<VariantPathSegment> parsedPath = parsedPath(path);
-        Variant current = variant;
-        for (VariantPathSegment segment : parsedPath) {
-            if (segment instanceof ObjectExtraction && current.isObject()) {
-                current = current.getField(((ObjectExtraction) segment).getKey());
-            } else if (segment instanceof ArrayExtraction && current.isArray()) {
-                current = current.getElement(((ArrayExtraction) segment).getIndex());
-            } else {
-                return null;
-            }
-            if (current == null) {
-                return null;
-            }
-        }
-        return current;
+    public static ParsedPath parsePath(String path) {
+        final List<VariantPathSegment> segments =
+                parse(path)
+                        .orElseThrow(
+                                () ->
+                                        new TableRuntimeException(
+                                                String.format(
+                                                        "Failed to parse this path: %s", path)));
+        return new ParsedPath(segments);
     }
 
-    private static List<VariantPathSegment> parsedPath(String path) {
-        Optional<List<VariantPathSegment>> parsed = parse(path);
-        if (parsed.isEmpty()) {
-            throw new TableRuntimeException(String.format("Failed to parse this path: %s", path));
-        } else {
-            return parsed.get();
+    /** An immutable parsed path that can be reused across input values. */
+    @Internal
+    public static final class ParsedPath {
+        private final List<VariantPathSegment> segments;
+
+        private ParsedPath(List<VariantPathSegment> segments) {
+            this.segments = List.copyOf(segments);
+        }
+
+        /**
+         * Extracts a sub-variant. The root path {@code $} returns the input itself.
+         *
+         * <p>Null input, missing fields, out-of-bounds indices, and container type mismatches
+         * return null. An explicit VARIANT null is preserved when it is the extracted value.
+         */
+        public @Nullable Variant extract(@Nullable Variant variant) {
+            Variant current = variant;
+            for (VariantPathSegment segment : segments) {
+                if (current == null) {
+                    return null;
+                }
+                if (segment instanceof ObjectExtraction && current.isObject()) {
+                    current = current.getField(((ObjectExtraction) segment).getKey());
+                } else if (segment instanceof ArrayExtraction && current.isArray()) {
+                    current = current.getElement(((ArrayExtraction) segment).getIndex());
+                } else {
+                    return null;
+                }
+            }
+            return current;
         }
     }
 

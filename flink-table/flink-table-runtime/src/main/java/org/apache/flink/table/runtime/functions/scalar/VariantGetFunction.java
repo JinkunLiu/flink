@@ -27,6 +27,7 @@ import org.apache.flink.table.functions.BuiltInFunctionDefinitions;
 import org.apache.flink.table.functions.FunctionContext;
 import org.apache.flink.table.functions.SpecializedFunction;
 import org.apache.flink.table.runtime.functions.VariantGetUtils;
+import org.apache.flink.table.runtime.functions.VariantGetUtils.ParsedPath;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.types.variant.Variant;
@@ -42,12 +43,19 @@ import static org.apache.flink.table.api.Expressions.$;
 @Internal
 public class VariantGetFunction extends BuiltInScalarFunction {
 
+    private final String path;
     private final @Nullable SpecializedFunction.ExpressionEvaluator castEvaluator;
     private final @Nullable DataStructureConverter<Object, Object> castResultConverter;
+    private transient ParsedPath parsedPath;
     private transient @Nullable MethodHandle castHandle;
 
     public VariantGetFunction(SpecializedFunction.SpecializedContext context) {
         super(BuiltInFunctionDefinitions.VARIANT_GET, context);
+
+        path =
+                context.getCallContext()
+                        .getArgumentValue(1, String.class)
+                        .orElseThrow(IllegalStateException::new);
 
         if (getOutputDataType().getLogicalType().is(LogicalTypeRoot.VARIANT)) {
             castEvaluator = null;
@@ -68,6 +76,7 @@ public class VariantGetFunction extends BuiltInScalarFunction {
 
     @Override
     public void open(FunctionContext context) throws Exception {
+        parsedPath = VariantGetUtils.parsePath(path);
         if (castEvaluator != null) {
             castHandle = castEvaluator.open(context);
             castResultConverter.open(context.getUserCodeClassLoader());
@@ -75,8 +84,7 @@ public class VariantGetFunction extends BuiltInScalarFunction {
     }
 
     public @Nullable Object eval(@Nullable Variant variant, @Nullable StringData path) {
-        final Variant extracted =
-                VariantGetUtils.variantGet(variant, path == null ? null : path.toString());
+        final Variant extracted = parsedPath.extract(variant);
         if (extracted == null) {
             return null;
         }
