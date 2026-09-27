@@ -52,9 +52,11 @@ public final class VariantGetUtils {
     private VariantGetUtils() {}
 
     /**
-     * Parses a path for reuse across input values.
+     * Parses a path starting with {@code $}, followed by field accesses ({@code .name}, {@code
+     * ['name']}, {@code ["name"]}) or non-negative array indices up to {@link Integer#MAX_VALUE}.
      *
-     * @throws TableRuntimeException if the path is invalid
+     *
+     * @throws TableRuntimeException when the path is invalid
      */
     public static ParsedPath parsePath(String path) {
         final List<VariantPathSegment> segments =
@@ -100,14 +102,6 @@ public final class VariantGetUtils {
         }
     }
 
-    /**
-     * Parses a path starting with {@code $}, followed by {@code .name}, {@code ['name']}, {@code
-     * ["name"]}, or non-negative array indices such as {@code [0]}.
-     *
-     * <p>The root path {@code $} produces an empty list. Invalid paths, including indices exceeding
-     * {@link Integer#MAX_VALUE}, produce an empty optional. Whitespace is not skipped, and quoted
-     * field names are read literally without interpreting escapes.
-     */
     private static Optional<List<VariantPathSegment>> parse(String path) {
         if (path.isEmpty() || path.charAt(0) != '$') {
             return Optional.empty();
@@ -145,7 +139,6 @@ public final class VariantGetUtils {
         private VariantPathSegment() {}
     }
 
-    /** An object field access. */
     private static final class ObjectExtraction extends VariantPathSegment {
         private final String key;
 
@@ -158,7 +151,6 @@ public final class VariantGetUtils {
         }
     }
 
-    /** An array index access. */
     private static final class ArrayExtraction extends VariantPathSegment {
         private final int index;
 
