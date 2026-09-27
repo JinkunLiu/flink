@@ -18,30 +18,88 @@
 
 package org.apache.flink.table.runtime.functions.scalar;
 
+import org.apache.flink.annotation.Internal;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.StringData;
+import org.apache.flink.table.data.conversion.DataStructureConverter;
+import org.apache.flink.table.data.conversion.DataStructureConverters;
 import org.apache.flink.table.functions.BuiltInFunctionDefinitions;
+import org.apache.flink.table.functions.FunctionContext;
 import org.apache.flink.table.functions.SpecializedFunction;
-import org.apache.flink.types.variant.BinaryVariantInternalBuilder;
+import org.apache.flink.table.runtime.functions.VariantGetUtils;
+import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.types.variant.Variant;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import javax.annotation.Nullable;
 
+import java.lang.invoke.MethodHandle;
+
+import static org.apache.flink.table.api.Expressions.$;
+
 /** Implementation of {@link BuiltInFunctionDefinitions#TRY_VARIANT_GET}. */
+@Internal
 public class TryVariantGetFunction extends BuiltInScalarFunction {
+
+    private final @Nullable SpecializedFunction.ExpressionEvaluator castEvaluator;
+    private final @Nullable DataStructureConverter<Object, Object> castResultConverter;
+    private transient @Nullable MethodHandle castHandle;
 
     public TryVariantGetFunction(SpecializedFunction.SpecializedContext context) {
         super(BuiltInFunctionDefinitions.TRY_VARIANT_GET, context);
+
+        if (getOutputDataType().getLogicalType().is(LogicalTypeRoot.VARIANT)) {
+            castEvaluator = null;
+            castResultConverter = null;
+        } else {
+            final DataType targetType =
+                    context.getCallContext()
+                            .getOutputDataType()
+                            .orElseThrow(IllegalStateException::new);
+            castEvaluator =
+                    context.createEvaluator(
+                            $("value").tryCast(targetType),
+                            targetType,
+                            DataTypes.FIELD("value", DataTypes.VARIANT().toInternal()));
+            castResultConverter = DataStructureConverters.getConverter(targetType);
+        }
     }
 
-    public @Nullable Variant eval(@Nullable StringData jsonStr, boolean allowDuplicateKeys) {
-        if (jsonStr == null) {
+    @Override
+    public void open(FunctionContext context) throws Exception {
+        if (castEvaluator != null) {
+            castHandle = castEvaluator.open(context);
+            castResultConverter.open(context.getUserCodeClassLoader());
+        }
+    }
+
+    public @Nullable Object eval(@Nullable Variant variant, @Nullable StringData path) {
+        final Variant extracted =
+                VariantGetUtils.variantGet(variant, path == null ? null : path.toString());
+        if (extracted == null) {
             return null;
+        }
+        if (castEvaluator == null) {
+            return extracted;
         }
 
         try {
-            return BinaryVariantInternalBuilder.parseJson(jsonStr.toString(), allowDuplicateKeys);
-        } catch (Throwable e) {
-            return null;
+            return castResultConverter.toInternalOrNull(castHandle.invoke(extracted));
+        } catch (Throwable t) {
+            throw new FlinkRuntimeException(t);
+        }
+    }
+
+    public @Nullable Object eval(
+            @Nullable Variant variant, @Nullable StringData path, @Nullable StringData targetType) {
+        return eval(variant, path);
+    }
+
+    @Override
+    public void close() throws Exception {
+        if (castEvaluator != null) {
+            castEvaluator.close();
         }
     }
 }

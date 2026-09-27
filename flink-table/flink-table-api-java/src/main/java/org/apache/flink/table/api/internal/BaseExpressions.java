@@ -1430,10 +1430,14 @@ public abstract class BaseExpressions<InType, OutType> {
                         valueLiteral(returnType.getLogicalType().asSerializableString())));
     }
 
+    /** Like {@link #variantGet(String, DataType)}, but returns NULL on conversion failure. */
     public OutType tryVariantGet(String path, DataType returnType) {
         return toApiSpecificExpression(
                 unresolvedCall(
-                        TRY_VARIANT_GET, toExpr(), valueLiteral(path), typeLiteral(returnType)));
+                        TRY_VARIANT_GET,
+                        toExpr(),
+                        valueLiteral(path),
+                        valueLiteral(returnType.getLogicalType().asSerializableString())));
     }
 
     /** Returns the base string decoded with base64. */

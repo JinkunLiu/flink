@@ -85,7 +85,8 @@ public class VariantGetFunction extends BuiltInScalarFunction {
         }
 
         try {
-            return castResultConverter.toInternalOrNull(castHandle.invoke(extracted)); // todo：liujinkun02，确认下段代码
+            return castResultConverter.toInternalOrNull(
+                    castHandle.invoke(extracted)); // todo：liujinkun02，确认下段代码
         } catch (Throwable t) {
             throw new FlinkRuntimeException(t);
         }
