@@ -75,6 +75,9 @@ public final class SpecificTypeStrategies {
     /** See {@link GetTypeStrategy}. */
     public static final TypeStrategy GET = new GetTypeStrategy();
 
+    /** See {@link VariantGetTypeStrategy}. */
+    public static final TypeStrategy VARIANT_GET = new VariantGetTypeStrategy();
+
     /** See {@link DecimalModTypeStrategy}. */
     public static final TypeStrategy DECIMAL_MOD = new DecimalModTypeStrategy();
 

@@ -3176,6 +3176,54 @@ public final class BuiltInFunctionDefinitions {
                             "org.apache.flink.table.runtime.functions.scalar.TryParseJsonFunction")
                     .build();
 
+    public static final BuiltInFunctionDefinition VARIANT_GET =
+            BuiltInFunctionDefinition.newBuilder()
+                    .name("VARIANT_GET")
+                    .kind(SCALAR)
+                    .inputTypeStrategy(
+                            or(
+                                    sequence(
+                                            logical(LogicalTypeRoot.VARIANT),
+                                            and(
+                                                    logical(LogicalTypeFamily.CHARACTER_STRING),
+                                                    LITERAL)),
+                                    sequence(
+                                            logical(LogicalTypeRoot.VARIANT),
+                                            and(
+                                                    logical(LogicalTypeFamily.CHARACTER_STRING),
+                                                    LITERAL),
+                                            and(
+                                                    logical(LogicalTypeFamily.CHARACTER_STRING),
+                                                    LITERAL))))
+                    .outputTypeStrategy(SpecificTypeStrategies.VARIANT_GET)
+                    .runtimeClass(
+                            "org.apache.flink.table.runtime.functions.scalar.VariantGetFunction")
+                    .build();
+
+    public static final BuiltInFunctionDefinition TRY_VARIANT_GET =
+            BuiltInFunctionDefinition.newBuilder()
+                    .name("TRY_VARIANT_GET")
+                    .kind(SCALAR)
+                    .inputTypeStrategy(
+                            or(
+                                    sequence(
+                                            logical(LogicalTypeRoot.VARIANT),
+                                            and(
+                                                    logical(LogicalTypeFamily.CHARACTER_STRING),
+                                                    LITERAL)),
+                                    sequence(
+                                            logical(LogicalTypeRoot.VARIANT),
+                                            and(
+                                                    logical(LogicalTypeFamily.CHARACTER_STRING),
+                                                    LITERAL),
+                                            and(
+                                                    logical(LogicalTypeFamily.CHARACTER_STRING),
+                                                    LITERAL))))
+                    .outputTypeStrategy(SpecificTypeStrategies.VARIANT_GET)
+                    .runtimeClass(
+                            "org.apache.flink.table.runtime.functions.scalar.TryVariantGetFunction")
+                    .build();
+
     // --------------------------------------------------------------------------------------------
     // Bitmap functions
     // --------------------------------------------------------------------------------------------
