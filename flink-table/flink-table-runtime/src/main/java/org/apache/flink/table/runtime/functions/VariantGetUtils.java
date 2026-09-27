@@ -30,7 +30,7 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Runtime helpers for extracting VARIANT values using Spark-compatible paths. */
+/** Runtime helpers for extracting VARIANT values using field and array index paths. */
 @Internal
 public final class VariantGetUtils {
 

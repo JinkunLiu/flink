@@ -50,6 +50,15 @@ class VariantFunctionsITCase extends BuiltInFunctionTestBase {
                 .onFieldsWithData(json, null)
                 .andDataTypes(STRING().notNull(), STRING())
                 .testSqlResult(
+                        "VARIANT_GET(PARSE_JSON('{\"a\": true}'), '$.a', 'BOOLEAN')",
+                        true,
+                        BOOLEAN())
+                .testSqlResult(
+                        "VARIANT_GET(PARSE_JSON('{\"a\": true}'), '$.b', 'INT')", null, INT())
+                .testSqlRuntimeError(
+                        "VARIANT_GET(PARSE_JSON('{\"a\": \"oops\"}'), '$.a', 'INT')",
+                        "Cannot cast a VARIANT STRING value to INTEGER")
+                .testSqlResult(
                         "JSON_STRING(VARIANT_GET(PARSE_JSON(f0), '$.nested'))",
                         "{\"value\":7}",
                         STRING())
@@ -81,6 +90,16 @@ class VariantFunctionsITCase extends BuiltInFunctionTestBase {
         return TestSetSpec.forFunction(BuiltInFunctionDefinitions.TRY_VARIANT_GET)
                 .onFieldsWithData(json, null)
                 .andDataTypes(STRING().notNull(), STRING())
+                .testSqlResult(
+                        "TRY_VARIANT_GET(PARSE_JSON('{\"a\": true}'), '$.a', 'BOOLEAN')",
+                        true,
+                        BOOLEAN())
+                .testSqlResult(
+                        "TRY_VARIANT_GET(PARSE_JSON('{\"a\": true}'), '$.b', 'INT')", null, INT())
+                .testSqlResult(
+                        "TRY_VARIANT_GET(PARSE_JSON('{\"a\": \"oops\"}'), '$.a', 'INT')",
+                        null,
+                        INT())
                 .testSqlResult("TRY_VARIANT_GET(PARSE_JSON(f0), '$.count', 'INT')", 42, INT())
                 .testTableApiResult($("f0").parseJson().tryVariantGet("$.count", INT()), 42, INT())
                 .testTableApiResult(
