@@ -19,7 +19,9 @@
 package org.apache.flink.table.planner.functions;
 
 import org.apache.flink.table.functions.BuiltInFunctionDefinitions;
+import org.apache.flink.types.Row;
 
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.apache.flink.table.api.DataTypes.ARRAY;
@@ -66,6 +68,21 @@ class VariantFunctionsITCase extends BuiltInFunctionTestBase {
                 .testTableApiResult(
                         $("f0").parseJson().variantGet("$.name", STRING()), "Flink", STRING())
                 .testTableApiResult($("f0").parseJson().variantGet("$.count", INT()), 42, INT())
+                .testResult(
+                        $("f0").parseJson().variantGet("$.items", ARRAY(INT())),
+                        "VARIANT_GET(PARSE_JSON(f0), '$.items', 'ARRAY<INT>')",
+                        new Integer[] {10, 20},
+                        ARRAY(INT()))
+                .testResult(
+                        $("f0").parseJson().variantGet("$.nested", MAP(STRING(), INT())),
+                        "VARIANT_GET(PARSE_JSON(f0), '$.nested', 'MAP<STRING, INT>')",
+                        Map.of("value", 7),
+                        MAP(STRING(), INT()))
+                .testResult(
+                        $("f0").parseJson().variantGet("$.nested", ROW(FIELD("value", INT()))),
+                        "VARIANT_GET(PARSE_JSON(f0), '$.nested', 'ROW<value INT>')",
+                        Row.of(7),
+                        ROW(FIELD("value", INT())))
                 .testTableApiResult(
                         $("f0").parseJson().variantGet("$.enabled", BOOLEAN()), true, BOOLEAN())
                 .testTableApiResult($("f0").parseJson().variantGet("$.items[1]", INT()), 20, INT())
@@ -125,10 +142,21 @@ class VariantFunctionsITCase extends BuiltInFunctionTestBase {
                 .testSqlResult("TRY_VARIANT_GET(PARSE_JSON(f0), '$.name', 'INT')", null, INT())
                 .testTableApiResult($("f0").parseJson().tryVariantGet("$.name", INT()), null, INT())
                 .testSqlResult("TRY_VARIANT_GET(PARSE_JSON(f0), '$.large', 'INT')", null, INT())
-                .testTableApiResult(
+                .testResult(
                         $("f0").parseJson().tryVariantGet("$.items", ARRAY(INT())),
+                        "TRY_VARIANT_GET(PARSE_JSON(f0), '$.items', 'ARRAY<INT>')",
                         new Integer[] {10, 20},
                         ARRAY(INT()))
+                .testResult(
+                        $("f0").parseJson().tryVariantGet("$.nested", MAP(STRING(), INT())),
+                        "TRY_VARIANT_GET(PARSE_JSON(f0), '$.nested', 'MAP<STRING, INT>')",
+                        Map.of("value", 7),
+                        MAP(STRING(), INT()))
+                .testResult(
+                        $("f0").parseJson().tryVariantGet("$.nested", ROW(FIELD("value", INT()))),
+                        "TRY_VARIANT_GET(PARSE_JSON(f0), '$.nested', 'ROW<value INT>')",
+                        Row.of(7),
+                        ROW(FIELD("value", INT())))
                 .testSqlResult(
                         "TRY_VARIANT_GET(PARSE_JSON(f0), '$.badItems', 'ARRAY<INT>')",
                         null,
