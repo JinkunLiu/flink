@@ -37,8 +37,6 @@ import javax.annotation.Nullable;
 
 import java.lang.invoke.MethodHandle;
 
-import static org.apache.flink.table.api.Expressions.$;
-
 /** Implementation of {@link BuiltInFunctionDefinitions#VARIANT_GET}. */
 @Internal
 public class VariantGetFunction extends BuiltInScalarFunction {
@@ -67,9 +65,9 @@ public class VariantGetFunction extends BuiltInScalarFunction {
                             .orElseThrow(IllegalStateException::new);
             castEvaluator =
                     context.createEvaluator(
-                            $("value").cast(targetType),
+                            BuiltInFunctionDefinitions.CAST,
                             targetType,
-                            DataTypes.FIELD("value", DataTypes.VARIANT().toInternal()));
+                            DataTypes.VARIANT().toInternal());
             castResultConverter = DataStructureConverters.getConverter(targetType);
         }
     }

@@ -55,7 +55,6 @@ public final class VariantGetUtils {
      * Parses a path starting with {@code $}, followed by field accesses ({@code .name}, {@code
      * ['name']}, {@code ["name"]}) or non-negative array indices up to {@link Integer#MAX_VALUE}.
      *
-     *
      * @throws TableRuntimeException when the path is invalid
      */
     public static ParsedPath parsePath(String path) {
