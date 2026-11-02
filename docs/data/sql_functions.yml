@@ -1361,6 +1361,24 @@ variant:
       `allowDuplicateKeys` is false.
 
       See the `VARIANT` data type documentation for how JSON values are mapped to variant kinds.
+  - sql: TRY_VARIANT_GET(variant, path[, target_type])
+    table: VARIANT.tryVariantGet(path, returnType)
+    description: |
+      Extracts a value from a VARIANT at `path` and converts it to `target_type` using `TRY_CAST`.
+      The SQL target type is a string literal and defaults to `VARIANT` when omitted.
+      The Table API requires an explicit return type.
+
+      The path must be a string literal starting with `$`. It supports `.name`, `['name']`,
+      `["name"]`, and zero-based array indices such as `[0]`.
+      Invalid paths are rejected during function initialization, even when the input is NULL.
+      Returns SQL NULL for a null input, a missing field, an out-of-bounds index, a container
+      type mismatch, or a failed conversion. Invalid paths and invalid or unsupported target
+      types still cause errors. A VARIANT null is preserved when the target type is VARIANT;
+      otherwise it becomes SQL NULL. If conversion of an ARRAY, MAP, or ROW member fails,
+      the entire conversion returns SQL NULL.
+
+      For example, `TRY_VARIANT_GET(PARSE_JSON('{"count":42}'), '$.count', 'INT')` returns `42`,
+      while `TRY_VARIANT_GET(PARSE_JSON('{"count":"bad"}'), '$.count', 'INT')` returns NULL.
   - sql: JSON_STRING(variant)
     description: |
       Generate a json string from a Variant object.

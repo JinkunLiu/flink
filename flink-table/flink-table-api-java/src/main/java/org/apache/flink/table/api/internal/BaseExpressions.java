@@ -234,10 +234,12 @@ import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.TRIM;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.TRUNCATE;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.TRY_CAST;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.TRY_PARSE_JSON;
+import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.TRY_VARIANT_GET;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.UNHEX;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.UPPER;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.URL_DECODE;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.URL_ENCODE;
+import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.VARIANT_GET;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.VAR_POP;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.VAR_SAMP;
 import static org.apache.flink.table.functions.BuiltInFunctionDefinitions.WINDOW_END;
@@ -1417,6 +1419,47 @@ public abstract class BaseExpressions<InType, OutType> {
     public OutType tryParseJson(boolean allowDuplicateKeys) {
         return toApiSpecificExpression(
                 unresolvedCall(TRY_PARSE_JSON, toExpr(), valueLiteral(allowDuplicateKeys)));
+    }
+
+    /**
+     * Extracts a value from a {@link DataTypes#VARIANT()} at the given path and converts it to the
+     * specified type.
+     *
+     * <p>Returns {@code NULL} if the path does not exist. If the conversion fails, an error is
+     * thrown. To return {@code NULL} instead of an error, use {@link #tryVariantGet(String,
+     * DataType)}.
+     *
+     * @param path Path to extract, starting with {@code $}, e.g. {@code $.a[0]}.
+     * @param returnType Type to convert the extracted value to.
+     * @return The extracted value converted to the specified type.
+     */
+    public OutType variantGet(String path, DataType returnType) {
+        return toApiSpecificExpression(
+                unresolvedCall(
+                        VARIANT_GET,
+                        toExpr(),
+                        valueLiteral(path),
+                        valueLiteral(returnType.getLogicalType().asSerializableString())));
+    }
+
+    /**
+     * Extracts a value from a {@link DataTypes#VARIANT()} at the given path and converts it to the
+     * specified type.
+     *
+     * <p>Returns {@code NULL} if the path does not exist or the conversion fails. To throw an error
+     * on conversion failure instead, use {@link #variantGet(String, DataType)}.
+     *
+     * @param path Path to extract, starting with {@code $}, e.g. {@code $.a[0]}.
+     * @param returnType Type to convert the extracted value to.
+     * @return The extracted value converted to the specified type.
+     */
+    public OutType tryVariantGet(String path, DataType returnType) {
+        return toApiSpecificExpression(
+                unresolvedCall(
+                        TRY_VARIANT_GET,
+                        toExpr(),
+                        valueLiteral(path),
+                        valueLiteral(returnType.getLogicalType().asSerializableString())));
     }
 
     /** Returns the base string decoded with base64. */

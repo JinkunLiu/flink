@@ -1446,6 +1446,21 @@ variant:
 
       See the `VARIANT` data type documentation for how JSON values are mapped to variant kinds.
 
+  - sql: TRY_VARIANT_GET(variant, path[, target_type])
+    table: VARIANT.tryVariantGet(path, returnType)
+    description: |
+      从 VARIANT 中提取 `path` 指定的值，并使用 `TRY_CAST` 转换为 `target_type`。
+      SQL 中的目标类型必须是字符串字面量，省略时默认为 `VARIANT`。Table API 必须显式指定返回类型。
+
+      路径必须是以 `$` 开头的字符串字面量，支持 `.name`、`['name']`、`["name"]`
+      以及从零开始的数组索引（例如 `[0]`）。非法路径会在函数初始化时被拒绝，即使输入为 NULL。
+      输入为 NULL、字段不存在、数组索引越界、
+      容器类型不匹配或转换失败时返回 SQL NULL。非法路径以及非法或不支持的目标类型仍会报错。
+      目标类型为 VARIANT 时保留 VARIANT null，否则转换为 SQL NULL。
+      ARRAY、MAP 或 ROW 中任一成员转换失败时，整个转换结果为 SQL NULL。
+
+      例如，`TRY_VARIANT_GET(PARSE_JSON('{"count":42}'), '$.count', 'INT')` 返回 `42`，
+      而 `TRY_VARIANT_GET(PARSE_JSON('{"count":"bad"}'), '$.count', 'INT')` 返回 NULL。
   - sql: JSON_STRING(variant)
     description: |
       Generate a json string from a Variant object.
