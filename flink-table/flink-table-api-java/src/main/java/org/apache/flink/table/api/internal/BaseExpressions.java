@@ -1421,6 +1421,18 @@ public abstract class BaseExpressions<InType, OutType> {
                 unresolvedCall(TRY_PARSE_JSON, toExpr(), valueLiteral(allowDuplicateKeys)));
     }
 
+    /**
+     * Extracts a value from a {@link DataTypes#VARIANT()} at the given path and converts it to the
+     * specified type.
+     *
+     * <p>Returns {@code NULL} if the path does not exist. If the conversion fails, an error is
+     * thrown. To return {@code NULL} instead of an error, use {@link #tryVariantGet(String,
+     * DataType)}.
+     *
+     * @param path Path to extract, starting with {@code $}, e.g. {@code $.a[0]}.
+     * @param returnType Type to convert the extracted value to.
+     * @return The extracted value converted to the specified type.
+     */
     public OutType variantGet(String path, DataType returnType) {
         return toApiSpecificExpression(
                 unresolvedCall(
@@ -1430,7 +1442,17 @@ public abstract class BaseExpressions<InType, OutType> {
                         valueLiteral(returnType.getLogicalType().asSerializableString())));
     }
 
-    /** Like {@link #variantGet(String, DataType)}, but returns NULL on conversion failure. */
+    /**
+     * Extracts a value from a {@link DataTypes#VARIANT()} at the given path and converts it to the
+     * specified type.
+     *
+     * <p>Returns {@code NULL} if the path does not exist or the conversion fails. To throw an error
+     * on conversion failure instead, use {@link #variantGet(String, DataType)}.
+     *
+     * @param path Path to extract, starting with {@code $}, e.g. {@code $.a[0]}.
+     * @param returnType Type to convert the extracted value to.
+     * @return The extracted value converted to the specified type.
+     */
     public OutType tryVariantGet(String path, DataType returnType) {
         return toApiSpecificExpression(
                 unresolvedCall(
